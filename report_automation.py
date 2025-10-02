@@ -17,6 +17,7 @@ df_dalei = pd.read_excel(r'D:/桌面/模板/固定文件/企划品类.xlsx', she
 df_size = pd.read_excel(r'D:/桌面/模板/固定文件/企划品类.xlsx', sheet_name='规则')
 df_model = pd.read_excel(r'D:/桌面/模板/固定文件/企划品类.xlsx', sheet_name='模块')
 df_old_procurement  = pd.read_excel(r'D:/桌面/模板/固定文件/23年-24年采购明细.xlsx', sheet_name='Sheet1')
+df_old_report  = pd.read_excel(r'D:/桌面/模板/固定文件/22年-24年销售记录.xlsx', sheet_name='总表')
 
 # 获取当天日期
 today = datetime.now().strftime("%Y-%m-%d")
@@ -36,6 +37,8 @@ file_ndim_deliver_time = list(p.glob('*发货时间*.xlsx'))
 
 file_today = list(p.glob('*当日销售*.xlsx'))
 
+file_report = list(p.glob('*销售记录*.xlsx'))
+
 
 print("file_today:", file_today)
 print("file_psi:", file_psi)
@@ -44,6 +47,8 @@ print("file_caigou:", file_caigou)
 print("file_sales_details:", file_sales_details)
 print("file_ndim_payment_time:", file_ndim_payment_time)
 print("file_ndim_deliver_time:", file_ndim_deliver_time)
+print("file_file_report:", file_report)
+
 
 # 读取文件
 
@@ -68,6 +73,8 @@ df_today_sales = pd.read_excel(file_today[0])
 ## 库存视角
 df_psi = pd.read_excel(file_psi[0], usecols=[ "款式编码","商品编码","颜色","规格","实际库存数","订单占有数","销退仓库存","进货仓库存","采购在途数","销退在途数","虚拟库存数","可用数","公有可用数"])
 
+## 25年销售记录
+df_report = pd.read_excel(file_report[0])
 
 def Product_Output(df_product=df_product):
     new_columns_order = ["款式编码","图片","商品编码","颜色","规格","基本售价","成本价","创建时间",'供应商名称',"分类","年份","季节","商品名称"]
@@ -213,6 +220,22 @@ def CaiGou(df_caigou=df_caigou, df_old_procurement=df_old_procurement):
         aggfunc='sum'
     ).reset_index()
 
+    df_caigou_pivot_copy = df_caigou_pivot.copy()
+    df_caigou_pivot_copy.rename(columns={'总入库量': '全部总入库量'}, inplace=True)
+
+    # 专供款
+    df_caigou_beizhu = df_caigou[['款色','备注']].copy()
+    df_caigou_beizhu['小晶专供款'] = df_caigou['备注'].str.contains(r'小晶', na=False).map({True: '小晶', False: ''})
+    df_caigou_beizhu['唯品专供款'] = df_caigou['备注'].str.contains(r'唯品', na=False).map({True: '唯专', False: ''})
+
+    df_caigou_beizhu['标签'] = df_caigou_beizhu['小晶专供款'] + df_caigou_beizhu['唯品专供款']
+    df_caigou_beizhu.drop_duplicates(subset=['款色','标签'], keep='first', inplace=True)
+
+    df_caigou_pivot = df_caigou_pivot.merge(
+        df_caigou_beizhu[['款色','标签']],
+        on='款色',
+        how='left'
+    )
 
     df_caigou = df_caigou[df_caigou['标记|多标签'] != '返修退货']
     
@@ -227,7 +250,8 @@ def CaiGou(df_caigou=df_caigou, df_old_procurement=df_old_procurement):
     # 2. 按照款色、采购日期、采购供应商分组，并对采购数量进行汇总
     # df_grouped = df_caigou.groupby(['款色', '采购日期', '采购供应商'], as_index=False)['采购数量'].sum()
     df_grouped = df_caigou.groupby(['款色', '采购日期', '采购供应商'], as_index=False).agg({
-        '采购数量': 'sum'
+        '采购数量': 'sum',
+        '总入库量': 'sum'  
     })
 
 
@@ -236,8 +260,18 @@ def CaiGou(df_caigou=df_caigou, df_old_procurement=df_old_procurement):
 
     # 重置索引（可选）
     df_final = df_sorted.reset_index(drop=True)
+    df_final = df_final.merge(
+        df_caigou_pivot_copy[['款色', '全部总入库量']],
+        on='款色',
+        how='left'
+    )
 
-    return df_final, df_caigou_pivot
+    # 新品入库数量
+    df_final_new = df_final.drop_duplicates(subset=['款色'], keep='last')
+
+    df_final_new = df_final_new.merge(df_caigou_beizhu[['款色','标签']], on='款色', how='left')
+
+    return df_final, df_caigou_pivot, df_final_new
 
 
 def today_sales(df_today_sales=df_today_sales, df_product=df_product):
@@ -482,7 +516,29 @@ def Payment_Time_All(df_ndim_payment_time=df_ndim_payment_time, df_product=df_pr
 
     return df_ndim_payment_time, df_ndim_payment_time_pivot, df_ndim_payment_time_new
 
+def report(df_old_report=df_old_report, df_report=df_report):
+    df_report = pd.concat([df_old_report, df_report], ignore_index=True)
+    #根据分隔符分成两个字段
+    extracted = df_report['颜色规格'].str.extract(r'^(.*?);(.*)$')
+    df_report['颜色'] = extracted[0].fillna(df_report['颜色规格'])  # 无分号时用原值
+    df_report['规格'] = extracted[1]  # 无分号时为NaN
 
+    df_report['款色'] = df_report['款式编码'] + df_report['颜色']
+
+    fill_cols = ['销售数量', '退货数量']
+    for col in fill_cols:
+        df_report[col] = pd.to_numeric(df_report[col], errors='coerce').fillna(0)
+
+    df_report['净销量'] = df_report['销售数量'] - df_report['退货数量']
+
+    df_report_pivot = pd.pivot_table(
+        df_report,
+        index=['款色', '款式编码', '颜色'],
+        values=['销售数量', '退货数量','净销量'],
+        aggfunc='sum'
+    ).reset_index()
+
+    return df_report_pivot
 
 
 df_Paymemt_Time_All, df_ndim_payment_time_pivot, df_ndim_payment_time_new = Payment_Time_All(df_ndim_payment_time=df_ndim_payment_time, df_product=df_product, df_size=df_size, df_new_channel=df_new_channel)
@@ -497,7 +553,7 @@ df_details = Sales_Details(df_sales_details=df_sales_details, df_product=df_prod
 df_today = today_sales(df_today_sales, df_product)
 
 
-df_CaiGou, df_caigou_pivot = CaiGou(df_caigou=df_caigou, df_old_procurement=df_old_procurement)
+df_CaiGou, df_caigou_pivot,df_final_new = CaiGou(df_caigou=df_caigou, df_old_procurement=df_old_procurement)
 
 df_product_output = Product_Output(df_product=df_product)
 
@@ -505,13 +561,15 @@ df_filter = filter(df_psi=df_psi, df_product=df_product,
            df_ndim_payment_time=df_ndim_payment_time,
               df_new_category=df_new_category)
 
+df_report_pivot = report(df_old_report=df_old_report, df_report=df_report)
 
-with pd.ExcelWriter(f'D:/桌面/新版货盘表/{today}货盘表数据表.xlsx', engine='openpyxl') as writer:
+
+with pd.ExcelWriter(f'D:/桌面/新版货盘表/{today}货盘表数据表2.xlsx', engine='openpyxl') as writer:
     df_filter.to_excel(writer, sheet_name='款号筛选', index=False)
     df_product_output.to_excel(writer, sheet_name='商品资料', index=False)
     df_psi_output.to_excel(writer, sheet_name='库存视角', index=False)
     df_CaiGou.to_excel(writer, sheet_name='采购管理', index=False)
-    df_caigou_pivot.to_excel(writer, sheet_name='入库数量', index=False)
+    # df_caigou_pivot.to_excel(writer, sheet_name='入库数量', index=False)  入库数量不需要输出
     df_today.to_excel(writer, sheet_name='当天销售报表', index=False)
     df_details.to_excel(writer, sheet_name='过往一周销售明细', index=False)
     df_deliver_time_sum.to_excel(writer, sheet_name='近两月发货时间透视', index=False)
@@ -519,6 +577,8 @@ with pd.ExcelWriter(f'D:/桌面/新版货盘表/{today}货盘表数据表.xlsx',
     df_Deliver_Time_All.to_excel(writer, sheet_name='近两月发货时间明细', index=False)
     df_Paymemt_Time_All.to_excel(writer, sheet_name='近两月付款时间明细', index=False)
     df_ndim_payment_time_new.to_excel(writer, sheet_name='最早付款时间', index=False)
+    df_report_pivot.to_excel(writer, sheet_name='所有销售', index=False)
+    df_final_new.to_excel(writer, sheet_name='新品入库数量', index=False)
 
 # 记录结束时间并计算耗时
 end_time = time.time()
