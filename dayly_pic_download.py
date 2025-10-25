@@ -19,10 +19,12 @@ p = Path(CWD)
 file_path = list(p.glob(f'*{today_small}*.xlsx'))[0]
 print(file_path)
 
+# 获取当天日期
+today = datetime.now().strftime("%Y-%m-%d")
+print(today)
+
+
 def product():
-    # 获取当天日期
-    today = datetime.now().strftime("%Y-%m-%d")
-    print(today)
 
     CWD = f'D:/桌面/模板/{today}'
 
@@ -95,7 +97,9 @@ if __name__ == "__main__":
 
         for n, row in product_df_filter.iterrows():
             download_and_compress_image_plus(row['图片'], row['款色'])
+
             product_df_filter.to_clipboard(index=False)
+            product_df_filter.to_excel(f'D:/桌面/模板/{today}/每天新增图片.xlsx', index=False)
 
     else:
         print("文件读取失败，请检查密码或文件路径")

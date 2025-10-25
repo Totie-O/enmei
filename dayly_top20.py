@@ -78,10 +78,10 @@ def sales_details(df_sales_details=df_sales_details):
     )
     _tot_amt = df_sales_details_yesterday_copy_pivot['销售金额'].sum()
     _tot_qty = df_sales_details_yesterday_copy_pivot['销售数量'].sum()
-    df_sales_details_yesterday_copy_pivot['销售金额占比'] = (
+    df_sales_details_yesterday_copy_pivot['昨日销售金额占比'] = (
         df_sales_details_yesterday_copy_pivot['销售金额'] / _tot_amt
     ).round(4)
-    df_sales_details_yesterday_copy_pivot['销售数量占比'] = (
+    df_sales_details_yesterday_copy_pivot['昨日销售数量占比'] = (
         df_sales_details_yesterday_copy_pivot['销售数量'] / _tot_qty
     ).round(4)
     df_sales_details_yesterday_copy_pivot = df_sales_details_yesterday_copy_pivot.head(36)
@@ -96,7 +96,10 @@ def sales_details(df_sales_details=df_sales_details):
         how='left'
     )
 
-
+    df_sales_details_yesterday_copy_pivot['图片'] = ''
+    df_sales_details_yesterday_copy_pivot.reindex(
+        columns=['排名','款式编码','图片','昨日销售金额占比','昨日销售数量占比','商品简称','线上商品名']
+    )
     ####################################切片######################################
 
     # 筛选过去一周的数据（包含昨天）
@@ -193,7 +196,7 @@ if __name__ == "__main__":
         # df_week.to_excel(writer, sheet_name='过往一周销售明细', index=False)
         df_sales_details_pivot_week = df_merged_2.merge(df_huo_new_time, left_on='款式编码', right_on='款号', how='left')
         df_sales_details_pivot_week.to_excel(writer, sheet_name='过往销售top30', index=False)
-        
+
         df_sales_details_yesterday_copy_pivot.to_excel(writer, sheet_name='切片top36', index=False)
 
 

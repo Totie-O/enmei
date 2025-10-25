@@ -70,7 +70,7 @@ def download_and_compress_image_plus(url, name, output_dir="D:\\款色图片文�
         
 
 if __name__ == "__main__":
-    df = pd.read_excel(r"D:\桌面\款色图片.xlsx", sheet_name='Sheet14')
+    df = pd.read_excel(r"D:\桌面\款色图片.xlsx", sheet_name='Sheet20')
 
     for n, row in df.iterrows():
         download_and_compress_image_plus(row['图片'], row['款色'])
