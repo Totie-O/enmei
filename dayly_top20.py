@@ -96,10 +96,10 @@ def sales_details(df_sales_details=df_sales_details):
         how='left'
     )
 
-    df_sales_details_yesterday_copy_pivot['图片'] = ''
-    df_sales_details_yesterday_copy_pivot.reindex(
-        columns=['排名','款式编码','图片','昨日销售金额占比','昨日销售数量占比','商品简称','线上商品名']
-    )
+    df_sales_details_yesterday_copy_pivot['图片 '] = ''
+    df_sales_details_yesterday_copy_pivot = df_sales_details_yesterday_copy_pivot[
+        ['排名','款式编码','图片 ','昨日销售金额占比','昨日销售数量占比','商品简称','线上商品名']
+    ]
     ####################################切片######################################
 
     # 筛选过去一周的数据（包含昨天）
