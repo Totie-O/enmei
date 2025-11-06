@@ -37,6 +37,16 @@ df_product['款式编码'] = df_product['款式编码'].astype(str).str.upper()
 
 
 def sales_details(df_sales_details=df_sales_details):
+
+    ####################################u商品名称#########################################
+    df_sales_details_copy = df_sales_details.copy()
+    _title = df_sales_details_copy['线上商品名'].astype(str)
+    df_sales_details_copy['商品简称'] = _title.str.extract(r'【([^】]+)】', expand=False)
+    df_sales_details_copy['商品简称'].fillna(_title, inplace=True)
+    df_sales_details_copy_name = df_sales_details_copy[['款式编码',  '商品简称','线上商品名']]
+
+    ####################################u商品名称#########################################
+
     # 获取当前日期和时间
     now = datetime.now()
 
@@ -135,9 +145,9 @@ def sales_details(df_sales_details=df_sales_details):
     df_sales_details_pivot_30 = df_pivot(df_week, num=30)
     df_sales_details_pivot_20 = df_pivot(df_sales_details_yesterday, num=20)
 
-    return df_sales_details_yesterday, df_sales_details_pivot_20, df_week, df_sales_details_pivot_30, df_sales_details_yesterday_copy_pivot
+    return df_sales_details_yesterday, df_sales_details_pivot_20, df_week, df_sales_details_pivot_30, df_sales_details_yesterday_copy_pivot, df_sales_details_copy_name
 
-df_sales_details_yesterday, df_sales_details_pivot_20, df_week, df_sales_details_pivot_30, df_sales_details_yesterday_copy_pivot = sales_details()
+df_sales_details_yesterday, df_sales_details_pivot_20, df_week, df_sales_details_pivot_30, df_sales_details_yesterday_copy_pivot, df_sales_details_copy_name = sales_details()
 
 
 
@@ -198,6 +208,8 @@ if __name__ == "__main__":
         df_sales_details_pivot_week.to_excel(writer, sheet_name='过往销售top30', index=False)
 
         df_sales_details_yesterday_copy_pivot.to_excel(writer, sheet_name='切片top36', index=False)
+
+        df_sales_details_copy_name.to_excel(writer, sheet_name='商品简称表', index=False)
 
 
 
